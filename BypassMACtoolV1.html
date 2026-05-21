@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bypass MAC Tool - MikroTik Hotspot</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        h1 {
+            margin: 0 0 8px 0;
+            color: #1e3c72;
+        }
+        .sub {
+            color: #666;
+            margin-bottom: 24px;
+            border-left: 4px solid #2a5298;
+            padding-left: 16px;
+        }
+        .upload-area {
+            border: 2px dashed #2a5298;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: #f8faff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background: #eef3ff;
+            border-color: #1e3c72;
+        }
+        .upload-area.drag-over {
+            background: #e0e8ff;
+            border-color: #0d47a1;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            resize: vertical;
+            margin-top: 12px;
+        }
+        button {
+            background: #2a5298;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 12px;
+            transition: 0.2s;
+        }
+        button:hover {
+            background: #1e3c72;
+        }
+        .result-box {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .mac-list {
+            background: #f0f2f5;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .badge {
+            background: #2a5298;
+            color: white;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 13px;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+        .flex-2cols {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .col {
+            flex: 1;
+            min-width: 300px;
+        }
+        .copy-btn {
+            background: #28a745;
+            margin-left: 8px;
+        }
+        .copy-btn:hover {
+            background: #218838;
+        }
+        hr {
+            margin: 20px 0;
+        }
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>🔧 Bypass MAC Tool for MikroTik Hotspot</h1>
+        <div class="sub">Tự động phân tích file Excel (.xlsx) hoặc dữ liệu MAC → sinh code MikroTik CLI</div>
+
+        <!-- Upload file -->
+        <div class="upload-area" id="uploadArea">
+            📂 Kéo thả file Excel (.xlsx) vào đây hoặc click để chọn file<br>
+            <small style="color:#888;">(Hỗ trợ cột A chứa MAC dạng 064250117B2A hoặc đã có dấu :)</small>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none;">
+
+        <!-- Hoặc paste text -->
+        <div style="margin-top: 20px;">
+            <label>📋 Hoặc copy-paste danh sách MAC từ Excel (mỗi dòng 1 MAC):</label>
+            <textarea id="rawMacInput" rows="4" placeholder="064250117B2A
+064250119086
+06:42:50:11:8F:53
+..."></textarea>
+            <button id="processTextBtn">🔍 Xử lý danh sách từ text</button>
+        </div>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none;">
+        <div class="flex-2cols">
+            <div class="col">
+                <span class="badge" id="macCount">0</span> <strong>Địa chỉ MAC đã format</strong>
+                <div class="mac-list" id="macList"></div>
+                <button id="copyMacListBtn" class="copy-btn" style="background:#6c757d;">📋 Copy danh sách MAC</button>
+            </div>
+            <div class="col">
+                <strong>🎯 Code MikroTik CLI (Hotspot IP Binding - Type: bypassed)</strong>
+                <div class="result-box" id="mikrotikCode"></div>
+                <button id="copyCodeBtn" class="copy-btn">📋 Copy code MikroTik</button>
+            </div>
+        </div>
+        <hr>
+        <strong>⚡ Code dạng từng dòng lẻ (add thủ công từng MAC)</strong>
+        <div class="result-box" id="singleLinesCode" style="max-height:200px;"></div>
+        <button id="copySingleBtn" class="copy-btn">📋 Copy dạng từng dòng</button>
+
+        <div class="note">
+            💡 <strong>Hướng dẫn:</strong> Copy code ở ô "<strong>Code MikroTik CLI</strong>" → mở Terminal trên MikroTik → Paste và nhấn Enter. Toàn bộ MAC sẽ được thêm vào Hotspot IP Binding với type = bypassed.
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+    let currentMacs = [];
+
+    // Xử lý upload file
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('drag-over');
+    });
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) processFile(file);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (fileInput.files[0]) processFile(fileInput.files[0]);
+    });
+
+    function processFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
+            extractMacsFromRows(rows);
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    document.getElementById('processTextBtn').addEventListener('click', () => {
+        const rawText = document.getElementById('rawMacInput').value;
+        const lines = rawText.split(/\r?\n/);
+        const macs = [];
+        for (let line of lines) {
+            line = line.trim();
+            if (line === "") continue;
+            let clean = normalizeMac(line);
+            if (clean) macs.push(clean);
+        }
+        if (macs.length === 0) {
+            alert("Không tìm thấy MAC hợp lệ trong text!");
+            return;
+        }
+        currentMacs = [...new Map(macs.map(m => [m, m])).values()]; // unique
+        displayResults();
+    });
+
+    function extractMacsFromRows(rows) {
+        let macs = [];
+        for (let row of rows) {
+            if (!row || row.length === 0) continue;
+            let cell = row[0]; // cột A
+            if (cell === undefined || cell === null) cell = "";
+            cell = cell.toString().trim();
+            if (cell === "") continue;
+            // Bỏ qua nếu là header
+            if (cell.toLowerCase().includes("mac") || cell.toLowerCase().includes("string")) continue;
+            
+            let mac = normalizeMac(cell);
+            if (mac) macs.push(mac);
+        }
+        if (macs.length === 0) {
+            alert("Không tìm thấy MAC hợp lệ trong file! Hãy đảm bảo cột A chứa MAC (vd: 064250117B2A)");
+            return;
+        }
+        currentMacs = [...new Map(macs.map(m => [m, m])).values()];
+        displayResults();
+    }
+
+    function normalizeMac(raw) {
+        let cleaned = raw.toString().toUpperCase().replace(/[^0-9A-F]/g, '');
+        if (cleaned.length === 12) {
+            // format 06:42:50:11:7B:2A
+            return cleaned.match(/.{1,2}/g).join(':');
+        }
+        // Nếu đã có dấu : và đủ 17 ký tự
+        if (/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i.test(raw)) {
+            return raw.toUpperCase();
+        }
+        return null;
+    }
+
+    function displayResults() {
+        document.getElementById('resultCard').style.display = 'block';
+        document.getElementById('macCount').innerText = currentMacs.length;
+
+        // Hiển thị danh sách MAC
+        const macListDiv = document.getElementById('macList');
+        macListDiv.innerHTML = currentMacs.map(m => `<div>📌 ${m}</div>`).join('');
+
+        // Tạo code MikroTik dạng block
+        let codeLines = [];
+        codeLines.push("/ip hotspot ip-binding");
+        for (let mac of currentMacs) {
+            codeLines.push(`add mac-address=${mac} type=bypassed server=all comment="bypass MAC"`);
+        }
+        const fullCode = codeLines.join('\n');
+        document.getElementById('mikrotikCode').innerText = fullCode;
+
+        // Dạng từng dòng lẻ
+        const singleLines = currentMacs.map(m => `add mac-address=${m} type=bypassed server=all comment="bypass MAC"`).join('\n');
+        document.getElementById('singleLinesCode').innerText = singleLines;
+
+        // Scroll
+        document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Copy functions
+    document.getElementById('copyCodeBtn').addEventListener('click', () => {
+        const code = document.getElementById('mikrotikCode').innerText;
+        copyToClipboard(code, "Đã copy code MikroTik!");
+    });
+    document.getElementById('copySingleBtn').addEventListener('click', () => {
+        const code = document.getElementById('singleLinesCode').innerText;
+        copyToClipboard(code, "Đã copy danh sách từng dòng!");
+    });
+    document.getElementById('copyMacListBtn').addEventListener('click', () => {
+        const list = currentMacs.join('\n');
+        copyToClipboard(list, "Đã copy danh sách MAC!");
+    });
+
+    function copyToClipboard(text, successMsg) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert(successMsg);
+        }).catch(() => {
+            alert("Không thể copy, hãy copy thủ công.");
+        });
+    }
+</script>
+</body>
+</html>
